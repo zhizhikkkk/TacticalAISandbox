@@ -1,6 +1,7 @@
 using UnityEngine;
 using Sirenix.OdinInspector;
 using System.Collections.Generic;
+using System;
 
 public class GridManager : MonoBehaviour
 {
@@ -30,6 +31,7 @@ public class GridManager : MonoBehaviour
     [SerializeField] private bool showBlockedCells = true;
     [SerializeField] private Color blockedColor = new Color(1f, 0f, 0f, 0.5f);
 
+    private List<GridCell> _debugPath = new List<GridCell>();
 
     [Button("Scan Scene for Obstacles")]
     public void ScanSceneForObstacles()
@@ -64,7 +66,10 @@ public class GridManager : MonoBehaviour
         }
         Debug.Log($"<color=orange>Scan complete! Blocked {blockedCount} cells.</color>");
     }
-
+    public void SetDebugPath(List<GridCell> path)
+    {
+        _debugPath = path;
+    }
     private void Awake()
     {
         GenerateGridData();
@@ -74,15 +79,17 @@ public class GridManager : MonoBehaviour
     public void GenerateGridData()
     {
         cells.Clear();
+
         for (int x = 0; x < width; x++)
         {
             for (int z = 0; z < height; z++)
             {
                 Vector2Int coords = new Vector2Int(x, z);
-                // —читаем центр клетки в мировых координатах
                 Vector3 worldPos = transform.position + new Vector3(x * cellSize + cellSize / 2, 0, z * cellSize + cellSize / 2);
+                GridCell newCell = new GridCell(coords, worldPos);
+                
 
-                cells.Add(coords, new GridCell(coords, worldPos));
+                cells.Add(coords, newCell);
             }
         }
         Debug.Log($"<color=green>Grid Data Generated: {cells.Count} cells</color>");
@@ -98,6 +105,33 @@ public class GridManager : MonoBehaviour
     private void OnDrawGizmos()
     {
         DrawGridLines();
+        DrawBlockedCells();
+        DrawPath();
+
+    }
+    private void DrawPath()
+    {
+        if (_debugPath != null && _debugPath.Count > 0)
+        {
+            Gizmos.color = Color.yellow; 
+
+            for (int i = 0; i < _debugPath.Count; i++)
+            {
+                Vector3 center = _debugPath[i].WorldPosition + Vector3.up * 0.1f;
+                Vector3 size = new Vector3(cellSize * 0.8f, 0.05f, cellSize * 0.8f);
+                Gizmos.DrawCube(center, size);
+
+                if (i < _debugPath.Count - 1)
+                {
+                    Gizmos.DrawLine(_debugPath[i].WorldPosition + Vector3.up * 0.15f,
+                                    _debugPath[i + 1].WorldPosition + Vector3.up * 0.15f);
+                }
+            }
+        }
+
+    }
+    private void DrawBlockedCells()
+    {
 
         if (!showBlockedCells || cells == null || cells.Count == 0) return;
 
@@ -156,5 +190,10 @@ public class GridManager : MonoBehaviour
             cell.IsWalkable = isWalkable;
             cell.IsStaticObstacle = !isWalkable;
         }
+    }
+
+    public IEnumerable<GridCell> GetAllCells()
+    {
+        return cells.Values;
     }
 }

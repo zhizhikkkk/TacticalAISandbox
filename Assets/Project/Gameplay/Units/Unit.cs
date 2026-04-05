@@ -6,6 +6,8 @@ public class Unit : MonoBehaviour
     [Title("Grid Info")]
     [ReadOnly, SerializeField] private Vector2Int gridPosition;
 
+    [Title("Selection Settings")]
+    [SerializeField] private GameObject selectionVisual;
 
     private GridManager _gridManager;
 
@@ -32,6 +34,14 @@ public class Unit : MonoBehaviour
         if (cell != null)
         {
             transform.position = new Vector3(cell.WorldPosition.x, transform.position.y, cell.WorldPosition.z);
+        }
+    }
+
+    public void SetSelected(bool isSelected)
+    {
+        if (selectionVisual != null)
+        {
+            selectionVisual.SetActive(isSelected);
         }
     }
 }

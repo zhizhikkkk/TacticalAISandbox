@@ -14,9 +14,21 @@ public class GridCell
     [ShowInInspector, ReadOnly]
     public float DangerScore = 0f;
 
+
+    public int GCost; 
+    public int HCost; 
+    public int FCost => GCost + HCost;
+
+    public GridCell Parent;
     public GridCell(Vector2Int coords, Vector3 worldPos)
     {
         Coordinates = coords;
         WorldPosition = worldPos;
+    }
+    public void ResetPathfindingData()
+    {
+        GCost = int.MaxValue; 
+        HCost = 0;
+        Parent = null;
     }
 }
