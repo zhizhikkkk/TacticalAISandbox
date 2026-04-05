@@ -9,7 +9,7 @@ public class GridCell
 
 
     public bool IsWalkable = true; 
-    public bool IsOccupied = false;
+    public bool IsStaticObstacle = false;
 
     [ShowInInspector, ReadOnly]
     public float DangerScore = 0f;
