@@ -51,6 +51,11 @@ public class UnitSelectionHandler : MonoBehaviour
             {
                 Debug.Log($"<color=yellow>Путь найден! Длина: {_currentPath.Count} шагов.</color>");
                 _gridManager.SetDebugPath(_currentPath);
+                Unit unitScript = _selectedUnit.GetComponent<Unit>();
+                if (unitScript != null)
+                {
+                    unitScript.SetPath(_currentPath);
+                }
             }
             else
             {

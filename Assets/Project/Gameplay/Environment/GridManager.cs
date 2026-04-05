@@ -34,6 +34,11 @@ public class GridManager : MonoBehaviour
     private List<GridCell> _debugPath = new List<GridCell>();
 
     [Button("Scan Scene for Obstacles")]
+
+    void Start()
+    {
+        ScanSceneForObstacles();
+    }
     public void ScanSceneForObstacles()
     {
         if (cells == null || cells.Count == 0) GenerateGridData();
