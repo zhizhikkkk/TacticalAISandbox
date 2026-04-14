@@ -43,6 +43,7 @@ public class UnitSelectionHandler : MonoBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, 100f))
         {
             Vector2Int targetCoords = _gridManager.WorldToGrid(hit.point);
+            targetCoords = GetNearestValidCoords(targetCoords, _selectedUnit.transform.position);
 
             Vector2Int startCoords = _gridManager.WorldToGrid(_selectedUnit.transform.position);
             _currentPath = _pathfinder.FindPath(startCoords, targetCoords);
@@ -63,7 +64,49 @@ public class UnitSelectionHandler : MonoBehaviour
             }
         }
     }
-    
+    private Vector2Int GetNearestValidCoords(Vector2Int target, Vector3 unitWorldPos)
+    {
+        GridCell targetCell = _gridManager.GetCell(target.x, target.y);
+
+        if (targetCell != null && targetCell.IsWalkable) return target;
+
+        Queue<GridCell> queue = new Queue<GridCell>();
+        HashSet<GridCell> visited = new HashSet<GridCell>();
+
+        queue.Enqueue(targetCell);
+        visited.Add(targetCell);
+
+        int maxIterations = 50;
+        int iterations = 0;
+
+        while (queue.Count > 0 && iterations < maxIterations)
+        {
+            iterations++;
+            GridCell current = queue.Dequeue();
+
+            List<GridCell> neighbors = _pathfinder.GetNeighbors(current);
+
+            neighbors.Sort((a, b) =>
+                Vector3.Distance(a.WorldPosition, unitWorldPos).CompareTo(
+                Vector3.Distance(b.WorldPosition, unitWorldPos)));
+
+            foreach (var neighbor in neighbors)
+            {
+                if (visited.Contains(neighbor)) continue;
+
+                if (neighbor.IsWalkable)
+                {
+                    return neighbor.Coordinates;
+                }
+
+                visited.Add(neighbor);
+                queue.Enqueue(neighbor);
+            }
+        }
+
+        return target;
+    }
+
     private void OnClickPerformed(InputAction.CallbackContext context)
     {
         TrySelectUnit();

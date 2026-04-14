@@ -78,4 +78,29 @@ public class Pathfinder
         path.Reverse(); 
         return path;
     }
+
+    public List<GridCell> GetNeighbors(GridCell cell, bool includeDiagonals = true)
+    {
+        List<GridCell> neighbors = new List<GridCell>();
+
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int z = -1; z <= 1; z++)
+            {
+                if (x == 0 && z == 0) continue;
+
+                if (!includeDiagonals && Mathf.Abs(x) == 1 && Mathf.Abs(z) == 1) continue;
+
+                Vector2Int neighborCoords = new Vector2Int(cell.Coordinates.x + x, cell.Coordinates.y + z);
+                GridCell neighbor = _gridManager.GetCell(neighborCoords.x, neighborCoords.y);
+
+                if (neighbor != null)
+                {
+                    neighbors.Add(neighbor);
+                }
+            }
+        }
+
+        return neighbors;
+    }
 }
