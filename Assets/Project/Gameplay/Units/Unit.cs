@@ -107,4 +107,14 @@ public class Unit : MonoBehaviour
             selectionVisual.SetActive(isSelected);
         }
     }
+
+    private void OnEnable()
+    {
+        _gridManager.RegisterUnit(this);
+    }
+
+    private void OnDisable()
+    {
+        _gridManager.UnregisterUnit(this);
+    }
 }

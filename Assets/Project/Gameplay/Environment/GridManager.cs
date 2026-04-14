@@ -35,6 +35,12 @@ public class GridManager : MonoBehaviour
 
     [Button("Scan Scene for Obstacles")]
 
+    private List<Unit> _allUnits = new List<Unit>();
+    public IReadOnlyList<Unit> AllUnits => _allUnits; 
+
+    public void RegisterUnit(Unit unit) => _allUnits.Add(unit);
+    public void UnregisterUnit(Unit unit) => _allUnits.Remove(unit);
+
     void Start()
     {
         ScanSceneForObstacles();
