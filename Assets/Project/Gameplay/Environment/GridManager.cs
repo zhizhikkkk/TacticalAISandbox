@@ -112,13 +112,13 @@ public class GridManager : MonoBehaviour
         DrawGridLines();
         DrawBlockedCells();
         DrawPath();
-
     }
-    private void DrawPath()
+
+    public void DrawPath()
     {
         if (_debugPath != null && _debugPath.Count > 0)
         {
-            Gizmos.color = Color.yellow; 
+            Gizmos.color = Color.yellow;
 
             for (int i = 0; i < _debugPath.Count; i++)
             {
@@ -133,8 +133,8 @@ public class GridManager : MonoBehaviour
                 }
             }
         }
-
     }
+  
     private void DrawBlockedCells()
     {
 
@@ -200,5 +200,16 @@ public class GridManager : MonoBehaviour
     public IEnumerable<GridCell> GetAllCells()
     {
         return cells.Values;
+    }
+
+    public void SetCellOccupied(Vector2Int coords, bool isOccupied)
+    {
+        GridCell cell = GetCell(coords.x, coords.y);
+        if (cell != null)
+        {
+            if (cell.IsStaticObstacle) return;
+
+            cell.IsWalkable = !isOccupied;
+        }
     }
 }

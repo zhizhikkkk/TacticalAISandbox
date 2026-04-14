@@ -32,6 +32,7 @@ public class Unit : MonoBehaviour
     private void Start()
     {
         SnapToGrid();
+        _gridManager.SetCellOccupied(gridPosition, true);
     }
 
     [Button("Move Along Path")]
@@ -50,6 +51,7 @@ public class Unit : MonoBehaviour
 
     private IEnumerator FollowPathRoutine()
     {
+        _gridManager.SetCellOccupied(gridPosition, false);
         while (_currentPath.Count > 0)
         {
             GridCell targetCell = _currentPath[0];
@@ -65,6 +67,7 @@ public class Unit : MonoBehaviour
             _currentPath.RemoveAt(0);
         }
 
+        _gridManager.SetCellOccupied(gridPosition, true);
         _moveCoroutine = null;
         OnMovementFinished?.Invoke();
         Debug.Log($"<color=green>Unit {name} reached destination.</color>");
