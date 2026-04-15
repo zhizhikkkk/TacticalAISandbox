@@ -2,6 +2,7 @@ using UnityEngine;
 using Sirenix.OdinInspector;
 using System.Collections.Generic;
 using System;
+using System.Linq;
 
 public class GridManager : MonoBehaviour
 {
@@ -36,10 +37,32 @@ public class GridManager : MonoBehaviour
     [Button("Scan Scene for Obstacles")]
 
     private List<Unit> _allUnits = new List<Unit>();
-    public IReadOnlyList<Unit> AllUnits => _allUnits; 
+    private List<Unit> _playerUnits = new List<Unit>();
+    private List<Unit> _enemyUnits = new List<Unit>();
+    public IReadOnlyList<Unit> AllUnits => _allUnits;
 
-    public void RegisterUnit(Unit unit) => _allUnits.Add(unit);
-    public void UnregisterUnit(Unit unit) => _allUnits.Remove(unit);
+    public IReadOnlyList<Unit> PlayerUnits => _playerUnits;
+    public IReadOnlyList<Unit> EnemyUnits => _enemyUnits;
+
+    public void RegisterUnit(Unit unit)
+    {
+        if (unit.Faction == UnitFaction.Player)
+        {
+            _playerUnits.Add(unit);
+        }
+        else if (unit.Faction == UnitFaction.Enemy)
+        {
+            _enemyUnits.Add(unit);
+        }
+
+    }
+
+    public void UnregisterUnit(Unit unit)
+    {
+        _playerUnits.Remove(unit);
+        _enemyUnits.Remove(unit);
+
+    }
 
     void Start()
     {

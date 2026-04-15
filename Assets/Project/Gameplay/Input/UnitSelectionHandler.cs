@@ -1,34 +1,37 @@
 using UnityEngine;
 using Zenject;
 using Sirenix.OdinInspector;
-using UnityEngine.InputSystem;
 using System.Collections.Generic;
+using UnityEngine.InputSystem;
 using System.Linq;
 
 public class UnitSelectionHandler : MonoBehaviour
 {
+    #region Variables
     [Title("Settings")]
     [SerializeField] private LayerMask unitLayer;
-    [SerializeField] private RectTransform selectionBoxVisual;
+    [SerializeField] private SelectionBoxVisualizer visualizer;
 
     [Title("Debug")]
     [ReadOnly, ShowInInspector] private List<Unit> _selectedUnits = new List<Unit>();
 
     private Camera _mainCamera;
     private PlayerInput _inputActions;
-    private Pathfinder _pathfinder;
     private GridManager _gridManager;
+    private Pathfinder _pathfinder;
 
     private Vector2 _startMousePos;
     private bool _isDragging;
+    #endregion
 
+    #region Initialization
     [Inject]
-    private void Construct(PlayerInput inputActions, Camera sceneCamera, Pathfinder pathfinder, GridManager gridManager)
+    private void Construct(PlayerInput input, Camera cam, GridManager grid, Pathfinder path)
     {
-        _inputActions = inputActions;
-        _mainCamera = sceneCamera;
-        _pathfinder = pathfinder;
-        _gridManager = gridManager;
+        _inputActions = input;
+        _mainCamera = cam;
+        _gridManager = grid;
+        _pathfinder = path;
     }
 
     private void Start()
@@ -37,95 +40,37 @@ public class UnitSelectionHandler : MonoBehaviour
         _inputActions.Gameplay.Click.canceled += OnClickReleased;
         _inputActions.Gameplay.RightClick.performed += OnRightClickPerformed;
     }
+    #endregion
 
     private void Update()
     {
         if (_isDragging)
-        {
-            UpdateSelectionBox();
-        }
+            visualizer.Show(_startMousePos, _inputActions.Gameplay.Point.ReadValue<Vector2>());
     }
 
-    #region Mouse Input Events
-
-    private void OnClickStarted(InputAction.CallbackContext context)
+    #region Mouse Events
+    private void OnClickStarted(InputAction.CallbackContext ctx)
     {
         _startMousePos = _inputActions.Gameplay.Point.ReadValue<Vector2>();
         _isDragging = true;
 
-        DeselectAll();
+        if (!Keyboard.current.shiftKey.isPressed) DeselectAll();
     }
 
-    private void OnClickReleased(InputAction.CallbackContext context)
+    private void OnClickReleased(InputAction.CallbackContext ctx)
     {
         _isDragging = false;
-        selectionBoxVisual.gameObject.SetActive(false);
+        visualizer.Hide();
 
-        Vector2 endMousePos = _inputActions.Gameplay.Point.ReadValue<Vector2>();
-
-        if (Vector2.Distance(_startMousePos, endMousePos) < 5f)
-        {
+        Vector2 endPos = _inputActions.Gameplay.Point.ReadValue<Vector2>();
+        if (Vector2.Distance(_startMousePos, endPos) < 5f)
             TrySelectSingleUnit(_startMousePos);
-        }
         else
-        {
-            TrySelectUnitsInBox(_startMousePos, endMousePos);
-        }
+            TrySelectUnitsInBox(_startMousePos, endPos);
     }
-
-    private void OnRightClickPerformed(InputAction.CallbackContext context)
-    {
-        if (_selectedUnits.Count == 0) return;
-
-        Vector2 mousePos = _inputActions.Gameplay.Point.ReadValue<Vector2>();
-        Ray ray = _mainCamera.ScreenPointToRay(mousePos);
-
-        if (Physics.Raycast(ray, out RaycastHit hit, 100f))
-        {
-            Vector2Int targetBase = _gridManager.WorldToGrid(hit.point);
-
-            HashSet<Vector2Int> reservedCoords = new HashSet<Vector2Int>();
-
-            foreach (var unit in _selectedUnits)
-            {
-                Vector2Int finalTarget = GetNearestValidCoords(targetBase, unit.transform.position, reservedCoords);
-                reservedCoords.Add(finalTarget);
-
-                Vector2Int startCoords = _gridManager.WorldToGrid(unit.transform.position);
-                var path = _pathfinder.FindPath(startCoords, finalTarget);
-
-                if (path != null)
-                {
-                    unit.SetPath(path);
-                }
-            }
-        }
-    }
-
     #endregion
 
     #region Selection Logic
-
-    private void UpdateSelectionBox()
-    {
-        if (!selectionBoxVisual.gameObject.activeSelf)
-            selectionBoxVisual.gameObject.SetActive(true);
-
-        Vector2 currentMousePos = _inputActions.Gameplay.Point.ReadValue<Vector2>();
-
-        float minX = Mathf.Min(_startMousePos.x, currentMousePos.x);
-        float maxX = Mathf.Max(_startMousePos.x, currentMousePos.x);
-        float minY = Mathf.Min(_startMousePos.y, currentMousePos.y);
-        float maxY = Mathf.Max(_startMousePos.y, currentMousePos.y);
-
-        selectionBoxVisual.position = new Vector2(minX, minY);
-
-        Canvas canvas = selectionBoxVisual.GetComponentInParent<Canvas>();
-        float scaleFactor = canvas.scaleFactor;
-
-        selectionBoxVisual.sizeDelta = new Vector2(maxX - minX, maxY - minY) / scaleFactor;
-    }
-
     private void TrySelectSingleUnit(Vector2 pos)
     {
         Ray ray = _mainCamera.ScreenPointToRay(pos);
@@ -135,103 +80,109 @@ public class UnitSelectionHandler : MonoBehaviour
             if (unit != null) SelectUnit(unit);
         }
     }
-
+    //TODO: Optimize : OverlapBox / Octree/Quadtree
     private void TrySelectUnitsInBox(Vector2 start, Vector2 end)
     {
-        Rect selectionRect = new Rect(
-            Mathf.Min(start.x, end.x),
-            Mathf.Min(start.y, end.y),
-            Mathf.Abs(start.x - end.x),
-            Mathf.Abs(start.y - end.y)
-        );
+        Rect rect = new Rect(Mathf.Min(start.x, end.x), Mathf.Min(start.y, end.y),
+                             Mathf.Abs(start.x - end.x), Mathf.Abs(start.y - end.y));
 
-        var allUnits = _gridManager.AllUnits;
-
-        for (int i = 0; i < allUnits.Count; i++)
+        foreach (var unit in _gridManager.PlayerUnits)
         {
-            Unit unit = allUnits[i];
-
             if (unit == null) continue;
-
             Vector3 screenPos = _mainCamera.WorldToScreenPoint(unit.transform.position);
-
-            if (screenPos.z < 0) continue;
-
-            if (selectionRect.Contains((Vector2)screenPos))
-            {
-                SelectUnit(unit);
-            }
+            if (screenPos.z > 0 && rect.Contains((Vector2)screenPos)) SelectUnit(unit);
         }
     }
 
     private void SelectUnit(Unit unit)
     {
-        if (!_selectedUnits.Contains(unit))
-        {
-            _selectedUnits.Add(unit);
-            unit.SetSelected(true);
-        }
+        if (_selectedUnits.Contains(unit)) return;
+        _selectedUnits.Add(unit);
+        unit.SetSelected(true);
     }
 
     private void DeselectAll()
     {
-        foreach (var unit in _selectedUnits)
-        {
-            unit.SetSelected(false);
-        }
+        _selectedUnits.ForEach(u => { if (u != null) u.SetSelected(false); });
         _selectedUnits.Clear();
     }
-
     #endregion
 
-    private Vector2Int GetNearestValidCoords(Vector2Int target, Vector3 unitWorldPos, HashSet<Vector2Int> reserved)
+    #region Movement Commands
+    private void OnRightClickPerformed(InputAction.CallbackContext ctx)
+    {
+        if (_selectedUnits.Count == 0) return;
+
+        Ray ray = _mainCamera.ScreenPointToRay(_inputActions.Gameplay.Point.ReadValue<Vector2>());
+        if (Physics.Raycast(ray, out RaycastHit hit, 100f))
+        {
+            IssueMoveCommand(hit.point);
+        }
+    }
+
+    private void IssueMoveCommand(Vector3 worldPoint)
+    {
+        Vector2Int targetBase = _gridManager.WorldToGrid(worldPoint);
+        if (_gridManager.GetCell(targetBase.x, targetBase.y) == null) return;
+
+        bool isShift = Keyboard.current.shiftKey.isPressed;
+        HashSet<Vector2Int> reserved = new HashSet<Vector2Int>();
+
+        foreach (var unit in _selectedUnits)
+        {
+            if (unit == null) continue;
+
+            Vector2Int start = isShift ? unit.GetLastQueuedPosition() : _gridManager.WorldToGrid(unit.transform.position);
+            Vector2Int finalTarget = GetNearestValidCoords(targetBase, unit.transform.position, reserved);
+            reserved.Add(finalTarget);
+
+            var path = _pathfinder.FindPath(start, finalTarget);
+            if (path != null) unit.AddPath(path, !isShift);
+        }
+    }
+    #endregion
+
+    #region BFS Positioning
+    private Vector2Int GetNearestValidCoords(Vector2Int target, Vector3 unitPos, HashSet<Vector2Int> reserved)
     {
         GridCell targetCell = _gridManager.GetCell(target.x, target.y);
         if (targetCell == null) return target;
-        if (targetCell != null && targetCell.IsWalkable && !reserved.Contains(target)) return target;
 
-        Queue<GridCell> queue = new Queue<GridCell>();
+        if (targetCell.IsWalkable && !reserved.Contains(target)) return target;
+
+        var  queue = new PriorityQueue<GridCell, float>();
         HashSet<GridCell> visited = new HashSet<GridCell>();
 
-        queue.Enqueue(targetCell);
+        queue.Enqueue(targetCell, 0f);
         visited.Add(targetCell);
 
-        int maxIterations = 100;
         int iterations = 0;
-
-        while (queue.Count > 0 && iterations < maxIterations)
+        while (queue.Count > 0 && iterations < 100)
         {
             iterations++;
             GridCell current = queue.Dequeue();
-            List<GridCell> neighbors = _pathfinder.GetNeighbors(current);
 
-            neighbors.Sort((a, b) =>
-                Vector3.Distance(a.WorldPosition, unitWorldPos).CompareTo(
-                Vector3.Distance(b.WorldPosition, unitWorldPos)));
-
-            foreach (var neighbor in neighbors)
+            foreach (var n in _pathfinder.GetNeighbors(current))
             {
-                if (visited.Contains(neighbor)) continue;
+                if(visited.Contains(n)) continue;
 
-                if (neighbor.IsWalkable && !reserved.Contains(neighbor.Coordinates))
-                {
-                    return neighbor.Coordinates;
-                }
+                if (n.IsWalkable && !reserved.Contains(n.Coordinates)) return n.Coordinates;
 
-                visited.Add(neighbor);
-                queue.Enqueue(neighbor);
+                visited.Add(n);
+                float distSq = (n.WorldPosition - unitPos).sqrMagnitude;
+                queue.Enqueue(current, distSq);
+                
             }
         }
         return target;
     }
+    #endregion
 
     private void OnDestroy()
     {
-        if (_inputActions != null)
-        {
-            _inputActions.Gameplay.Click.started -= OnClickStarted;
-            _inputActions.Gameplay.Click.canceled -= OnClickReleased;
-            _inputActions.Gameplay.RightClick.performed -= OnRightClickPerformed;
-        }
+        if (_inputActions == null) return;
+        _inputActions.Gameplay.Click.started -= OnClickStarted;
+        _inputActions.Gameplay.Click.canceled -= OnClickReleased;
+        _inputActions.Gameplay.RightClick.performed -= OnRightClickPerformed;
     }
 }

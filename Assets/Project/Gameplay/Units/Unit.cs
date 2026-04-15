@@ -3,25 +3,49 @@ using Zenject;
 using Sirenix.OdinInspector;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.Events;
+public enum UnitFaction
 
+{
+
+    Player,
+
+    Enemy,
+
+    Neutral
+
+}
 public class Unit : MonoBehaviour
 {
-    [Title("Grid Info")]
-    [ReadOnly, SerializeField] private Vector2Int gridPosition;
+    #region Variables
 
-    [Title("Movement Settings")]
-    [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float rotationSpeed = 10f;
-    [SerializeField] private float stopDistance = 0.05f;
+    [TitleGroup("Movement Settings")]
+    [SerializeField, Min(0)] private float moveSpeed = 5f;
+    [SerializeField, Min(0)] private float rotationSpeed = 10f;
+    [SerializeField, Min(0)] private float stopDistance = 0.05f;
 
-    [Title("Selection Settings")]
+    [TitleGroup("Visuals")]
     [SerializeField] private GameObject selectionVisual;
+
+    [TitleGroup("Grid & State")]
+    [ReadOnly, ShowInInspector] private Vector2Int gridPosition;
+    [ReadOnly, ShowInInspector] private bool _isMoving = false;
+
+    public event System.Action OnMovementFinished;
+
+    [Title("Faction Settings")]
+    [SerializeField] private UnitFaction faction;
+    public UnitFaction Faction => faction;
 
     private GridManager _gridManager;
     private Coroutine _moveCoroutine;
-    private List<GridCell> _currentPath = new List<GridCell>();
+    private Queue<List<GridCell>> _commandQueue = new Queue<List<GridCell>>();
 
-    public System.Action OnMovementFinished;
+    private Vector2Int _lastTargetPos;
+
+    #endregion
+
+    #region Initialization
 
     [Inject]
     public void Construct(GridManager gridManager)
@@ -32,89 +56,131 @@ public class Unit : MonoBehaviour
     private void Start()
     {
         SnapToGrid();
+        _lastTargetPos = gridPosition;
         _gridManager.SetCellOccupied(gridPosition, true);
     }
 
-    [Button("Move Along Path")]
-    public void SetPath(List<GridCell> path)
+    private void OnEnable() => _gridManager?.RegisterUnit(this);
+
+    private void OnDisable()
     {
-        if (path == null || path.Count == 0) return;
-
-        if (_moveCoroutine != null)
-        {
-            StopCoroutine(_moveCoroutine);
-        }
-
-        _currentPath = new List<GridCell>(path); 
-        _moveCoroutine = StartCoroutine(FollowPathRoutine());
+        _gridManager?.UnregisterUnit(this);
+        StopCurrentMovement();
     }
 
-    private IEnumerator FollowPathRoutine()
+    #endregion
+
+    #region Public API
+
+    public void AddPath(List<GridCell> newPath, bool clearQueue)
     {
-        _gridManager.SetCellOccupied(gridPosition, false);
-        while (_currentPath.Count > 0)
+        if (newPath == null || newPath.Count == 0) return;
+
+        if (clearQueue)
         {
-            GridCell targetCell = _currentPath[0];
+            StopCurrentMovement();
+            _commandQueue.Clear();
+        }
+
+        _commandQueue.Enqueue(newPath);
+        _lastTargetPos = newPath[newPath.Count - 1].Coordinates;
+
+        if (!_isMoving)
+        {
+            ExecuteNextCommand();
+        }
+    }
+
+    public void SetSelected(bool isSelected) => selectionVisual?.SetActive(isSelected);
+
+    public Vector2Int GetLastQueuedPosition() => _lastTargetPos;
+
+    #endregion
+
+    #region Movement Logic
+
+    private void ExecuteNextCommand()
+    {
+        if (_commandQueue.Count > 0)
+        {
+            List<GridCell> nextPath = _commandQueue.Dequeue();
+            _moveCoroutine = StartCoroutine(FollowPathRoutine(nextPath));
+        }
+        else
+        {
+            _isMoving = false;
+        }
+    }
+
+    private IEnumerator FollowPathRoutine(List<GridCell> path)
+    {
+        _isMoving = true;
+        _gridManager.SetCellOccupied(gridPosition, false);
+
+        float sqrStopDistance = stopDistance * stopDistance;
+
+        for (int i = 0; i < path.Count; i++)
+        {
+            GridCell targetCell = path[i];
             Vector3 targetPosition = new Vector3(targetCell.WorldPosition.x, transform.position.y, targetCell.WorldPosition.z);
 
-            while (Vector3.Distance(transform.position, targetPosition) > stopDistance)
+            while ((transform.position - targetPosition).sqrMagnitude > sqrStopDistance)
             {
                 MoveAndRotateTowards(targetPosition);
                 yield return null;
             }
 
             gridPosition = targetCell.Coordinates;
-            _currentPath.RemoveAt(0);
         }
 
         _gridManager.SetCellOccupied(gridPosition, true);
-        _moveCoroutine = null;
-        OnMovementFinished?.Invoke();
-        Debug.Log($"<color=green>Unit {name} reached destination.</color>");
+        ExecuteNextCommand();
+
+        if (!_isMoving)
+        {
+            _lastTargetPos = gridPosition;
+            OnMovementFinished?.Invoke();
+        }
     }
 
     private void MoveAndRotateTowards(Vector3 target)
     {
         Vector3 direction = (target - transform.position).normalized;
-
         if (direction != Vector3.zero)
         {
             Quaternion targetRotation = Quaternion.LookRotation(direction);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
         }
-
         transform.position = Vector3.MoveTowards(transform.position, target, moveSpeed * Time.deltaTime);
     }
 
-    [Button("Snap to Grid")]
+    private void StopCurrentMovement()
+    {
+        if (_moveCoroutine != null)
+        {
+            StopCoroutine(_moveCoroutine);
+            _moveCoroutine = null;
+        }
+
+        _isMoving = false;
+        gridPosition = _gridManager.WorldToGrid(transform.position);
+        _gridManager.SetCellOccupied(gridPosition, true);
+        _lastTargetPos = gridPosition;
+    }
+
+    #endregion
+
+    #region Helpers
+
+    [Button]
     public void SnapToGrid()
     {
         if (_gridManager == null) return;
-
         gridPosition = _gridManager.WorldToGrid(transform.position);
         var cell = _gridManager.GetCell(gridPosition.x, gridPosition.y);
-
         if (cell != null)
-        {
             transform.position = new Vector3(cell.WorldPosition.x, transform.position.y, cell.WorldPosition.z);
-        }
     }
 
-    public void SetSelected(bool isSelected)
-    {
-        if (selectionVisual != null)
-        {
-            selectionVisual.SetActive(isSelected);
-        }
-    }
-
-    private void OnEnable()
-    {
-        _gridManager.RegisterUnit(this);
-    }
-
-    private void OnDisable()
-    {
-        _gridManager.UnregisterUnit(this);
-    }
+    #endregion
 }
