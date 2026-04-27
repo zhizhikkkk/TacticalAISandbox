@@ -50,14 +50,11 @@ public class UnitAnimator : MonoBehaviour
     {
         if (animator != null)
         {
-            animator.SetBool("IsShooting", false); 
+            animator.SetBool("IsShooting", false);
             animator.SetTrigger("Death");
-        }
-        else
-        {
-            Debug.LogError($"На объекте {gameObject.name} не найден Animator!");
-        }
 
+            animator.transform.localPosition = Vector3.zero;
+        }
         this.enabled = false;
     }
 }

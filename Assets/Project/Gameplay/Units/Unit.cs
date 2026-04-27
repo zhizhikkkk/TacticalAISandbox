@@ -172,8 +172,13 @@ public class Unit : MonoBehaviour
         _isMoving = false;
         OnMovementFinished?.Invoke();
         gridPosition = _gridManager.WorldToGrid(transform.position);
-        _gridManager.SetCellOccupied(gridPosition, true);
-        _lastTargetPos = gridPosition;
+        
+
+        if (!_isDead)
+        {
+            _gridManager.SetCellOccupied(gridPosition, true);
+            _lastTargetPos = gridPosition;
+        }
     }
 
     #endregion

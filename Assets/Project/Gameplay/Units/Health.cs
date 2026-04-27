@@ -48,12 +48,12 @@ public class Health : MonoBehaviour
             unit.enabled = false;
         }
 
-        if (TryGetComponent<Animator>(out var anim))
+        if (GetComponentInChildren<Animator>() is Animator anim)
         {
             anim.applyRootMotion = false;
+            anim.transform.localPosition = Vector3.zero;
         }
 
-        transform.position = new Vector3(transform.position.x, 0f, transform.position.z);
 
         Destroy(gameObject, 5f);
     }
