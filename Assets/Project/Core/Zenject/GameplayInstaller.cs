@@ -11,5 +11,6 @@ public class GameplayInstaller : MonoInstaller
 
         Container.Bind<GridNavigationService>().AsSingle();
         Container.Bind<Pathfinder>().AsSingle();
+        Container.BindInterfacesAndSelfTo<BulletPool>().FromComponentInHierarchy().AsSingle();
     }
 }

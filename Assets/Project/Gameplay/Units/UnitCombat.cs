@@ -1,5 +1,6 @@
 using Sirenix.OdinInspector;
 using UnityEngine;
+using Zenject;
 
 public class UnitCombat : MonoBehaviour
 {
@@ -13,15 +14,23 @@ public class UnitCombat : MonoBehaviour
     [Title("References")]
     [SerializeField] private Unit unit;
     [SerializeField] private Animator animator;
+    [SerializeField] private Transform muzzlePoint;
+    
 
     private Health _currentTarget;
     private float _lastAttackTime;
     private Health _myHealth;
-
+    private BulletPool _bulletPool;
     private static readonly int IsShootingHash = Animator.StringToHash("IsShooting");
 
     public bool HasTarget => _currentTarget != null && !_currentTarget.IsDead;
     public Health CurrentTarget => _currentTarget;
+
+    [Inject]
+    public void Construct(BulletPool bulletPool)
+    {
+        _bulletPool = bulletPool;
+    }
 
     private void Awake()
     {
@@ -112,10 +121,17 @@ public class UnitCombat : MonoBehaviour
     private void ExecuteAttack()
     {
         _lastAttackTime = Time.time;
-        if (_currentTarget != null)
-        {
-            _currentTarget.TakeDamage(damage, transform);
+        if (_currentTarget == null) return;
+        
+        _currentTarget.TakeDamage(damage, transform);
+        Debug.Log($"_bulletPool: {_bulletPool}, muzzlePoint :{muzzlePoint}");
+        if (_bulletPool != null && muzzlePoint != null) {
+            Bullet bullet = _bulletPool.Get(muzzlePoint.position, muzzlePoint.rotation);
+            bullet.Init(_currentTarget.transform, _bulletPool);
+            bullet.gameObject.SetActive(true);
+            Debug.Log($"Пуля выпущена!");
         }
+        
     }
 
     private void RotateTowardsTarget()
