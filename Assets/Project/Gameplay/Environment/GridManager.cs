@@ -7,18 +7,15 @@ using System.Linq;
 public class GridManager : MonoBehaviour
 {
     [Title("Grid Settings")]
-
     [SerializeField, OnValueChanged("OnGridParamsChanged")]
     private int width = 20;
-
     [SerializeField, OnValueChanged("OnGridParamsChanged")]
     private int height = 20;
-
     [SerializeField, OnValueChanged("OnGridParamsChanged")]
     private float cellSize = 1f;
 
     [Title("Debug Visualization")]
-    [SerializeField] private bool showGrid = true; 
+    [SerializeField] private bool showGrid = true;
     [SerializeField] private Color gridColor = Color.cyan;
 
     [ShowInInspector, ReadOnly]
@@ -35,53 +32,45 @@ public class GridManager : MonoBehaviour
     private List<GridCell> _debugPath = new List<GridCell>();
 
     [Button("Scan Scene for Obstacles")]
-
     private List<Unit> _allUnits = new List<Unit>();
     private List<Unit> _playerUnits = new List<Unit>();
     private List<Unit> _enemyUnits = new List<Unit>();
-    public IReadOnlyList<Unit> AllUnits => _allUnits;
 
+    public IReadOnlyList<Unit> AllUnits => _allUnits;
     public IReadOnlyList<Unit> PlayerUnits => _playerUnits;
     public IReadOnlyList<Unit> EnemyUnits => _enemyUnits;
 
     public void RegisterUnit(Unit unit)
     {
-        if (unit.Faction == UnitFaction.Player)
-        {
-            _playerUnits.Add(unit);
-        }
-        else if (unit.Faction == UnitFaction.Enemy)
-        {
-            _enemyUnits.Add(unit);
-        }
-
+        if (unit.Faction == UnitFaction.Player) _playerUnits.Add(unit);
+        else if (unit.Faction == UnitFaction.Enemy) _enemyUnits.Add(unit);
     }
 
     public void UnregisterUnit(Unit unit)
     {
         _playerUnits.Remove(unit);
         _enemyUnits.Remove(unit);
-
     }
 
     void Start()
     {
         ScanSceneForObstacles();
     }
+
     public void ScanSceneForObstacles()
     {
         if (cells == null || cells.Count == 0) GenerateGridData();
-
         int blockedCount = 0;
 
         foreach (var cell in cells.Values)
         {
             Vector3 halfExtents = new Vector3(cellSize * 0.45f, obstacleCheckHeight / 2f, cellSize * 0.45f);
-
-            Collider[] hitColliders = Physics.OverlapBox(cell.WorldPosition + Vector3.up * (obstacleCheckHeight / 2f),
-                                                        halfExtents,
-                                                        Quaternion.identity,
-                                                        obstacleLayers);
+            Collider[] hitColliders = Physics.OverlapBox(
+                cell.WorldPosition + Vector3.up * (obstacleCheckHeight / 2f),
+                halfExtents,
+                Quaternion.identity,
+                obstacleLayers
+            );
 
             if (hitColliders.Length > 0)
             {
@@ -89,26 +78,26 @@ public class GridManager : MonoBehaviour
                 cell.IsStaticObstacle = true;
                 blockedCount++;
             }
-            else
+            else if (cell.IsStaticObstacle)
             {
-                if (cell.IsStaticObstacle)
-                {
-                    cell.IsWalkable = true;
-                    cell.IsStaticObstacle = false;
-                }
+                cell.IsWalkable = true;
+                cell.IsStaticObstacle = false;
             }
         }
+
         Debug.Log($"<color=orange>Scan complete! Blocked {blockedCount} cells.</color>");
     }
+
     public void SetDebugPath(List<GridCell> path)
     {
         _debugPath = path;
     }
+
     private void Awake()
     {
         GenerateGridData();
     }
-    #region draw grid
+
     [Button("Generate Grid Data")]
     public void GenerateGridData()
     {
@@ -120,21 +109,20 @@ public class GridManager : MonoBehaviour
             {
                 Vector2Int coords = new Vector2Int(x, z);
                 Vector3 worldPos = transform.position + new Vector3(x * cellSize + cellSize / 2, 0, z * cellSize + cellSize / 2);
-                GridCell newCell = new GridCell(coords, worldPos);
-                
-
-                cells.Add(coords, newCell);
+                cells.Add(coords, new GridCell(coords, worldPos));
             }
         }
+
         Debug.Log($"<color=green>Grid Data Generated: {cells.Count} cells</color>");
     }
+
     public GridCell GetCell(int x, int z)
     {
         Vector2Int key = new Vector2Int(x, z);
         return cells.TryGetValue(key, out var cell) ? cell : null;
     }
-    private void OnGridParamsChanged() => GenerateGridData();
 
+    private void OnGridParamsChanged() => GenerateGridData();
 
     private void OnDrawGizmos()
     {
@@ -145,28 +133,28 @@ public class GridManager : MonoBehaviour
 
     public void DrawPath()
     {
-        if (_debugPath != null && _debugPath.Count > 0)
+        if (_debugPath == null || _debugPath.Count == 0) return;
+
+        Gizmos.color = Color.yellow;
+
+        for (int i = 0; i < _debugPath.Count; i++)
         {
-            Gizmos.color = Color.yellow;
+            Vector3 center = _debugPath[i].WorldPosition + Vector3.up * 0.1f;
+            Vector3 size = new Vector3(cellSize * 0.8f, 0.05f, cellSize * 0.8f);
+            Gizmos.DrawCube(center, size);
 
-            for (int i = 0; i < _debugPath.Count; i++)
+            if (i < _debugPath.Count - 1)
             {
-                Vector3 center = _debugPath[i].WorldPosition + Vector3.up * 0.1f;
-                Vector3 size = new Vector3(cellSize * 0.8f, 0.05f, cellSize * 0.8f);
-                Gizmos.DrawCube(center, size);
-
-                if (i < _debugPath.Count - 1)
-                {
-                    Gizmos.DrawLine(_debugPath[i].WorldPosition + Vector3.up * 0.15f,
-                                    _debugPath[i + 1].WorldPosition + Vector3.up * 0.15f);
-                }
+                Gizmos.DrawLine(
+                    _debugPath[i].WorldPosition + Vector3.up * 0.15f,
+                    _debugPath[i + 1].WorldPosition + Vector3.up * 0.15f
+                );
             }
         }
     }
-  
+
     private void DrawBlockedCells()
     {
-
         if (!showBlockedCells || cells == null || cells.Count == 0) return;
 
         foreach (var cell in cells.Values)
@@ -174,14 +162,13 @@ public class GridManager : MonoBehaviour
             if (!cell.IsWalkable)
             {
                 Gizmos.color = blockedColor;
-
                 Vector3 center = cell.WorldPosition + Vector3.up * 0.05f;
                 Vector3 size = new Vector3(cellSize * 0.9f, 0.1f, cellSize * 0.9f);
-
                 Gizmos.DrawCube(center, size);
             }
         }
     }
+
     private void DrawGridLines()
     {
         if (!showGrid) return;
@@ -202,15 +189,13 @@ public class GridManager : MonoBehaviour
             Gizmos.DrawLine(start, end);
         }
     }
-    #endregion
 
     public Vector2Int WorldToGrid(Vector3 worldPos)
     {
+        if (this == null) return Vector2Int.zero;
         Vector3 localPos = worldPos - transform.position;
-
         int x = Mathf.FloorToInt(localPos.x / cellSize);
         int z = Mathf.FloorToInt(localPos.z / cellSize);
-
         return new Vector2Int(x, z);
     }
 
@@ -234,11 +219,21 @@ public class GridManager : MonoBehaviour
     public void SetCellOccupied(Vector2Int coords, bool isOccupied)
     {
         GridCell cell = GetCell(coords.x, coords.y);
+
         if (cell != null)
         {
-            if (cell.IsStaticObstacle) return;
-
             cell.IsWalkable = !isOccupied;
+        }
+    }
+    [Button("Force Clear Dynamic Obstacles")]
+    public void ClearDynamicObstacles()
+    {
+        foreach (var cell in GetAllCells())
+        {
+            if (!cell.IsStaticObstacle)
+            {
+                cell.IsWalkable = true;
+            }
         }
     }
 }

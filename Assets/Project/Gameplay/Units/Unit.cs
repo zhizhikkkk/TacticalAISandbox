@@ -32,6 +32,7 @@ public class Unit : MonoBehaviour
     [ReadOnly, ShowInInspector] private bool _isMoving = false;
 
     public event System.Action OnMovementFinished;
+    public event System.Action OnMovementStarted;
 
     [Title("Faction Settings")]
     [SerializeField] private UnitFaction faction;
@@ -42,6 +43,9 @@ public class Unit : MonoBehaviour
     private Queue<List<GridCell>> _commandQueue = new Queue<List<GridCell>>();
 
     private Vector2Int _lastTargetPos;
+
+    public bool IsMoving => _isMoving;
+    
 
     #endregion
 
@@ -64,6 +68,7 @@ public class Unit : MonoBehaviour
 
     private void OnDisable()
     {
+        if (!gameObject.scene.isLoaded) return;
         _gridManager?.UnregisterUnit(this);
         StopCurrentMovement();
     }
@@ -109,12 +114,14 @@ public class Unit : MonoBehaviour
         else
         {
             _isMoving = false;
+            OnMovementFinished?.Invoke();
         }
     }
 
     private IEnumerator FollowPathRoutine(List<GridCell> path)
     {
         _isMoving = true;
+        OnMovementStarted?.Invoke();
         _gridManager.SetCellOccupied(gridPosition, false);
 
         float sqrStopDistance = stopDistance * stopDistance;
@@ -163,6 +170,7 @@ public class Unit : MonoBehaviour
         }
 
         _isMoving = false;
+        OnMovementFinished?.Invoke();
         gridPosition = _gridManager.WorldToGrid(transform.position);
         _gridManager.SetCellOccupied(gridPosition, true);
         _lastTargetPos = gridPosition;
@@ -183,4 +191,19 @@ public class Unit : MonoBehaviour
     }
 
     #endregion
+    private bool _isDead = false;
+    public void ReleaseCell()
+    {
+        _isDead = true; 
+        StopCurrentMovement();
+
+        if (_gridManager != null)
+        {
+            _gridManager.SetCellOccupied(gridPosition, false);
+            _gridManager.SetCellOccupied(_lastTargetPos, false);
+
+            Vector2Int actualCoords = _gridManager.WorldToGrid(transform.position);
+            _gridManager.SetCellOccupied(actualCoords, false);
+        }
+    }
 }
