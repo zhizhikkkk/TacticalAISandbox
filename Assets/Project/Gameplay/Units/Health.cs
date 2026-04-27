@@ -4,17 +4,18 @@ using UnityEngine.Events;
 
 public class Health : MonoBehaviour
 {
-    [SerializeField] private UnitFaction faction ;
+    
     [SerializeField] private float maxHealth = 100f;
     [ReadOnly, ShowInInspector] private float _currentHealth;
 
     public UnityAction OnDeath;
 
     public UnityAction<Transform> OnTakeDamage;
-
+    public float CurrentHealth => _currentHealth;
+    public float MaxHealth => maxHealth;
 
     public bool IsDead { get; private set; }
-    public UnitFaction Faction => faction;
+    public UnitFaction Faction => GetComponent<Unit>()?.Faction ?? UnitFaction.Neutral;
     private void Awake()
     {
         _currentHealth = maxHealth;
@@ -46,6 +47,7 @@ public class Health : MonoBehaviour
         {
             unit.ReleaseCell();
             unit.enabled = false;
+            unit.SetSelected(false);
         }
 
         if (GetComponentInChildren<Animator>() is Animator anim)
