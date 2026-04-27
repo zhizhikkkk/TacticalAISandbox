@@ -46,6 +46,7 @@ public class UnitSelectionHandler : MonoBehaviour
     {
         if (_isDragging)
             visualizer.Show(_startMousePos, _inputActions.Gameplay.Point.ReadValue<Vector2>());
+
     }
 
     #region Mouse Events
@@ -99,8 +100,13 @@ public class UnitSelectionHandler : MonoBehaviour
         if (_selectedUnits.Contains(unit)) return;
         _selectedUnits.Add(unit);
         unit.SetSelected(true);
+        var health = unit.GetComponent<Health>();
+        if (health != null) health.OnDeath += () => OnUnitDied(unit);
     }
-
+    private void OnUnitDied(Unit unit)
+    {
+        _selectedUnits.Remove(unit);
+    }
     private void DeselectAll()
     {
         _selectedUnits.ForEach(u => { if (u != null) u.SetSelected(false); });
